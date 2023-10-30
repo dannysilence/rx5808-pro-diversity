@@ -215,7 +215,7 @@ void setupSettings() {
     Receiver::setChannel(EepromSettings.startChannel);
 }
 
-#define DATA_LENGTH    0x20
+#define DATA_LENGTH    0x08
 #define DATA_START     0xAA
 #define DATA_END       0xBB
 
@@ -287,6 +287,7 @@ void loop() {
     Ui::update();
     EepromSettings.update();
 
+    /*
     if (
         StateMachine::currentState != StateMachine::State::SCREENSAVER
         && StateMachine::currentState != StateMachine::State::BANDSCAN
@@ -295,9 +296,10 @@ void loop() {
     ) {
         StateMachine::switchState(StateMachine::State::SCREENSAVER);
     }
+    */
 
     if(showNewData()) {
-      
+      uint8_t a = receivedBytes[0];
     }
 }
 
