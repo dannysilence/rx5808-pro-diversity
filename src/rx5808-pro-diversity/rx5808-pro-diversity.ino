@@ -64,6 +64,7 @@ static void globalMenuButtonHandler(
 
 Stream* sa;
 Stream* log;
+Stream* pad;
 
 // returns setting value ; 0 - channel, 1 - frequency, 2 - version. returns -1 in case of read failure 
 // smartAudio V1 response: VTX: 0xAA 0x55 0x01 (Version/Command) 0x06 (Length) 0x00 (Channel) 0x00 (Power Level) 0x01(OperationMode) 0x16 0xE9(Current Frequency 5865) 0x4D(CRC8)
@@ -147,6 +148,7 @@ void setup()
     Serial.begin(115200);
     sa = &(saSerial);
     log = &(Serial);
+    pad = &(Serial);
 	
     setupPins();
 
@@ -175,7 +177,7 @@ void setup()
     //digitalWrite(PIN_LED, LOW);
     //digitalWrite(PIN_BUZZER, HIGH);
 
-    Buttons::registerChangeFunc(globalMenuButtonHandler);
+    //Buttons::registerChangeFunc(globalMenuButtonHandler);
 
     // Switch to initial state.
     StateMachine::switchState(StateMachine::State::SEARCH);
@@ -213,10 +215,74 @@ void setupSettings() {
     Receiver::setChannel(EepromSettings.startChannel);
 }
 
+#define DATA_LENGTH    0x20
+#define DATA_START     0xAA
+#define DATA_END       0xBB
+
+bool newData       = false;
+uint8_t numReceived = 0;
+uint8_t receivedBytes[DATA_LENGTH];
+
+void receiveBytes(Stream* stream) 
+{
+    static bool recvInProgress = false;
+    static uint8_t ndx = 0;
+
+    uint8_t rb;   
+
+    while (stream->available() > 0 && newData == false) 
+    {
+        rb = stream->read();
+        String szrb = String(rb, HEX); szrb += " ";
+        //Serial.print(szrb);
+
+        if (recvInProgress == true) 
+        {
+            if (rb != DATA_END) 
+            {
+                receivedBytes[ndx] = rb;
+                if (ndx++ >= DATA_LENGTH) ndx = DATA_LENGTH - 1;
+            }
+            else 
+            //if (stream->available() ? stream->read() == JOYSTICK_DATA_END : false)
+            {
+                receivedBytes[ndx] = '\0'; // terminate the string
+                recvInProgress = false;
+                numReceived = ndx;  // save the number for use when printing
+                ndx = 0;
+                newData = true;
+            }
+        }
+
+         else if (rb == DATA_START) recvInProgress = true;
+    }
+}
+
+bool showNewData() 
+{
+    if (newData == true) 
+    {
+            String m = "This came in: ";
+            for (byte n = 0; n < numReceived; n++) 
+            {
+                m += String(receivedBytes[n], HEX);
+                m += " ";
+            }
+            _log->println(m);
+	    
+        newData = false;
+
+        return true;
+    }
+
+    return false;
+}
+
+
 
 void loop() {
     Receiver::update();
-    Buttons::update();
+    //Buttons::update();
     StateMachine::update();
     Ui::update();
     EepromSettings.update();
@@ -228,6 +294,10 @@ void loop() {
             (SCREENSAVER_TIMEOUT * 1000)
     ) {
         StateMachine::switchState(StateMachine::State::SCREENSAVER);
+    }
+
+    if(showNewData()) {
+      
     }
 }
 
