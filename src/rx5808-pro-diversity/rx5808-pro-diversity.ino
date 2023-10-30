@@ -48,12 +48,12 @@ SOFTWARE.
 #include <SoftwareSerial.h>
 
 const byte rxPin = 2;
-const byte saPin = 3;
+const byte txPin = 3;
 
 
 // Set up a new SoftwareSerial object
 
-SoftwareSerial saSerial (rxPin, saPin, 4800);
+SoftwareSerial saSerial (rxPin, txPin, 4800);
 
 
 static void globalMenuButtonHandler(
@@ -63,9 +63,9 @@ static void globalMenuButtonHandler(
 
 
 Stream* sa;
-Stream* log;
-Stream* pad;
+//Stream* log;
 
+/*
 // returns setting value ; 0 - channel, 1 - frequency, 2 - version. returns -1 in case of read failure 
 // smartAudio V1 response: VTX: 0xAA 0x55 0x01 (Version/Command) 0x06 (Length) 0x00 (Channel) 0x00 (Power Level) 0x01(OperationMode) 0x16 0xE9(Current Frequency 5865) 0x4D(CRC8)
 // smartAudio V2 response: VTX: 0xAA 0x55 0x09 (Version/Command) 0x06 (Length) 0x01 (Channel) 0x00 (Power Level) 0x1A(OperationMode) 0x16 0xE9(Current Frequency 5865) 0xDA(CRC
@@ -127,35 +127,29 @@ void setOutFrequency(int frequency) {
   String y = "VTX Actual Frequency: ${x}";
   log->print(y);
 }
+*/
 
 // set the channel in the range 0-40
 // example: 0xAA 0x55 0x07(Command 3) 0x01(Length) 0x00(All 40 Channels 0-40) 0xB8(CRC8
 void setOutChannel(byte channel) {
   byte* b =  {0x00,0x00,0xAA,0x55,0x07,0x01,channel,0x00,0x00};
-  String m = "VTX Channel: ${channel}"; 
+  //String m = "VTX Channel: ${channel}"; 
   sa->write(b, 9);
-  log->print(m);
+  //log->print(m);
     
-  int x = getOutSetting(0) ;
-  String y = "VTX Actual Channel: ${x}";
-  log->print(y);
+  //int x = getOutSetting(0) ;
+  //String y = "VTX Actual Channel: ${x}";
+  //log->print(y);
 }
-
 
 
 void setup()
 {
     Serial.begin(115200);
     sa = &(saSerial);
-    log = &(Serial);
-    pad = &(Serial);
+    //log = &(Serial);
 	
     setupPins();
-
-    // Enable buzzer and LED for duration of setup process.
-    //digitalWrite(PIN_LED, HIGH);
-    //digitalWrite(PIN_BUZZER, LOW);
-
     setupSettings();
 
     StateMachine::setup();
@@ -163,34 +157,9 @@ void setup()
     Ui::setup();
 
     Receiver::setActiveReceiver(Receiver::ReceiverId::A);
-
-/*
-    #ifdef USE_IR_EMITTER
-        Serial.begin(9600);
-    #endif
-    #ifdef USE_SERIAL_OUT
-        Serial.begin(250000);
-    #endif
-*/
-
-    // Setup complete.
-    //digitalWrite(PIN_LED, LOW);
-    //digitalWrite(PIN_BUZZER, HIGH);
-
-    //Buttons::registerChangeFunc(globalMenuButtonHandler);
-
-    // Switch to initial state.
-    StateMachine::switchState(StateMachine::State::SEARCH);
 }
 
 void setupPins() {
-    //pinMode(PIN_LED, OUTPUT);
-    //pinMode(PIN_BUZZER, OUTPUT);
-    //pinMode(PIN_BUTTON_UP, INPUT_PULLUP);
-    //pinMode(PIN_BUTTON_MODE, INPUT_PULLUP);
-    //pinMode(PIN_BUTTON_DOWN, INPUT_PULLUP);
-    //pinMode(PIN_BUTTON_SAVE, INPUT_PULLUP);
-
     //pinMode(PIN_LED_A,OUTPUT);
     #ifdef USE_DIVERSITY
         //pinMode(PIN_LED_B,OUTPUT);
@@ -203,7 +172,7 @@ void setupPins() {
 
     pinMode(PIN_SPI_SLAVE_SELECT, OUTPUT);
     pinMode(PIN_SPI_DATA, OUTPUT);
-	pinMode(PIN_SPI_CLOCK, OUTPUT);
+    pinMode(PIN_SPI_CLOCK, OUTPUT);
 
     digitalWrite(PIN_SPI_SLAVE_SELECT, HIGH);
     digitalWrite(PIN_SPI_CLOCK, LOW);
@@ -215,112 +184,39 @@ void setupSettings() {
     Receiver::setChannel(EepromSettings.startChannel);
 }
 
-#define DATA_LENGTH    0x08
-#define DATA_START     0xAA
-#define DATA_END       0xBB
-
-bool newData       = false;
-uint8_t numReceived = 0;
-uint8_t receivedBytes[DATA_LENGTH];
-
-void receiveBytes(Stream* stream) 
-{
-    static bool recvInProgress = false;
-    static uint8_t ndx = 0;
-
-    uint8_t rb;   
-
-    while (stream->available() > 0 && newData == false) 
-    {
-        rb = stream->read();
-        String szrb = String(rb, HEX); szrb += " ";
-        //Serial.print(szrb);
-
-        if (recvInProgress == true) 
-        {
-            if (rb != DATA_END) 
-            {
-                receivedBytes[ndx] = rb;
-                if (ndx++ >= DATA_LENGTH) ndx = DATA_LENGTH - 1;
-            }
-            else 
-            //if (stream->available() ? stream->read() == JOYSTICK_DATA_END : false)
-            {
-                receivedBytes[ndx] = '\0'; // terminate the string
-                recvInProgress = false;
-                numReceived = ndx;  // save the number for use when printing
-                ndx = 0;
-                newData = true;
-            }
-        }
-
-         else if (rb == DATA_START) recvInProgress = true;
-    }
-}
-
-bool showNewData() 
-{
-    if (newData == true) 
-    {
-            String m = "This came in: ";
-            for (byte n = 0; n < numReceived; n++) 
-            {
-                m += String(receivedBytes[n], HEX);
-                m += " ";
-            }
-            _log->println(m);
-	    
-        newData = false;
-
-        return true;
-    }
-
-    return false;
-}
-
-
-
 void loop() {
     Receiver::update();
-    //Buttons::update();
     StateMachine::update();
     Ui::update();
     EepromSettings.update();
 
-    /*
-    if (
-        StateMachine::currentState != StateMachine::State::SCREENSAVER
-        && StateMachine::currentState != StateMachine::State::BANDSCAN
-        && (millis() - Buttons::lastChangeTime) >
-            (SCREENSAVER_TIMEOUT * 1000)
-    ) {
-        StateMachine::switchState(StateMachine::State::SCREENSAVER);
-    }
-    */
-
-    if(showNewData()) {
-      // a = 0 - nop, 1 - set rx ch(b), 2 - set tx ch(b), 3 - set rx+tx(b+c) ch
+    if(sa->available()) {
+      byte a = sa->readByte();
 	    
-      uint8_t a = receivedBytes[0];
-      uint8_t b = receivedBytes[1];
-      uint8_t c = receivedBytes[2];
+      if(a == 0xAA) {
+        byte b = sa->readByte();
+        
+	if(b == 0x55) {
+	  byte c = sa->readByte();
 
-      switch (a) {
-        case 1:
-	  Receiver::setChannel(b);
-	  break;
-        case 2:
-          setOutChannel(b);
-	  break;
-	case 3:
-	  Receiver::setChannel(b);
-	  setOutChannel(c);
-	  break;
-        case 0:
-          
-	  break;
+	  if(c == 0x07) {
+            sa->readByte();
+
+	    // channel set by FC, e.g. channel of source vehicle vtx
+	    byte d = sa->readByte();
+            Receiver::setChannel(d);
+
+	    // simply set out vtx with different channel from what fc set to vrx
+	    byte e = random(0,40);
+            while(e == d) {
+	      e = random(0,40);
+	    }
+
+	    setOutChannel(e);
+	  }
+	}
       }
-   }
+    }
 }
 
 
@@ -340,4 +236,5 @@ static void globalMenuButtonHandler(
     // TODO talk to fc
     
 }
+
 
