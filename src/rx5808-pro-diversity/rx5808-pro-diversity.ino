@@ -299,8 +299,28 @@ void loop() {
     */
 
     if(showNewData()) {
+      // a = 0 - nop, 1 - set rx ch(b), 2 - set tx ch(b), 3 - set rx+tx(b+c) ch
+	    
       uint8_t a = receivedBytes[0];
-    }
+      uint8_t b = receivedBytes[1];
+      uint8_t c = receivedBytes[2];
+
+      switch (a) {
+        case 1:
+	  Receiver::setChannel(b);
+	  break;
+        case 2:
+          setOutChannel(b);
+	  break;
+	case 3:
+	  Receiver::setChannel(b);
+	  setOutChannel(c);
+	  break;
+        case 0:
+          
+	  break;
+      }
+   }
 }
 
 
