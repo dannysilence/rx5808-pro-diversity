@@ -45,6 +45,16 @@ SOFTWARE.
 
 #include "ui.h"
 
+#include <SoftwareSerial.h>
+
+const byte rxPin = 2;
+const byte saPin = 3;
+
+
+// Set up a new SoftwareSerial object
+
+SoftwareSerial saSerial (rxPin, saPin, 4800);
+
 
 static void globalMenuButtonHandler(
     Button button,
@@ -52,13 +62,97 @@ static void globalMenuButtonHandler(
 );
 
 
+Stream* sa;
+Stream* log;
+
+// returns setting value ; 0 - channel, 1 - frequency, 2 - version. returns -1 in case of read failure 
+// smartAudio V1 response: VTX: 0xAA 0x55 0x01 (Version/Command) 0x06 (Length) 0x00 (Channel) 0x00 (Power Level) 0x01(OperationMode) 0x16 0xE9(Current Frequency 5865) 0x4D(CRC8)
+// smartAudio V2 response: VTX: 0xAA 0x55 0x09 (Version/Command) 0x06 (Length) 0x01 (Channel) 0x00 (Power Level) 0x1A(OperationMode) 0x16 0xE9(Current Frequency 5865) 0xDA(CRC
+int getOutSetting(byte setting) {
+  byte * buf = {0x00,0x00,0xAA,0x55,0x03,0x00,0x00,0x00,0x00};
+  String m = "VTX Get Settings";
+	
+  sa->write(buf, 9);
+  log->print(m);
+
+  byte a = -1;
+    
+  for(int count = 1; count < 12; count++) {
+    byte b = sa->readByte();
+    if( a == -1) {
+      if (b == 0xAA ) {
+        a = count;
+      }
+    }
+    else
+      if(setting == 0 && count - a == 4){
+        return b;
+      }
+
+      if (setting == 1 && count - a == 6) {
+        byte c = sa->readByte();
+
+        return b * 0x100 + c;
+      }
+
+      if (setting == 0 && count - a == 2) {
+        if(b == 0x01) {
+          return 1;
+        }
+
+        if(b == 0x09) {
+          return 2;
+        }
+
+        return -1;
+      }
+    }
+
+    return -1;
+  }
+}
+
+// set the frequency in the range 5000-6000 MHz
+// Example: 0xAA 0x55 0x09(Command 4) 0x02(Length) 0x16 0xE9(Frequency 5865) 0xDC(CRC8
+void setOutFrequency(int frequency) {
+  byte a = frequency / 0x100;
+  byte b = frequency % 0x100;
+  byte * c = {0x00,0x00,0xAA,0x55,0x09,0x02,a,b,0x00};
+  String m = "VTX Frequency: ${frequency}" ;
+  sa->write(c, 9);
+  log->print(m);
+
+  int x = getOutSetting(1) ;
+  String y = "VTX Actual Frequency: ${x}";
+  log->print(y);
+}
+
+// set the channel in the range 0-40
+// example: 0xAA 0x55 0x07(Command 3) 0x01(Length) 0x00(All 40 Channels 0-40) 0xB8(CRC8
+void setOutChannel(byte channel) {
+  byte* b =  {0x00,0x00,0xAA,0x55,0x07,0x01,channel,0x00,0x00};
+  String m = "VTX Channel: ${channel}"; 
+  sa->write(b, 9);
+  log->print(m);
+    
+  int x = getOutSetting(0) ;
+  String y = "VTX Actual Channel: ${x}";
+  log->print(y);
+}
+
+
+
 void setup()
 {
+    Serial.begin(115200);
+    sa = &(saSerial);
+    log = &(Serial);
+	
     setupPins();
 
     // Enable buzzer and LED for duration of setup process.
-    digitalWrite(PIN_LED, HIGH);
-    digitalWrite(PIN_BUZZER, LOW);
+    //digitalWrite(PIN_LED, HIGH);
+    //digitalWrite(PIN_BUZZER, LOW);
 
     setupSettings();
 
@@ -68,16 +162,18 @@ void setup()
 
     Receiver::setActiveReceiver(Receiver::ReceiverId::A);
 
+/*
     #ifdef USE_IR_EMITTER
         Serial.begin(9600);
     #endif
     #ifdef USE_SERIAL_OUT
         Serial.begin(250000);
     #endif
+*/
 
     // Setup complete.
-    digitalWrite(PIN_LED, LOW);
-    digitalWrite(PIN_BUZZER, HIGH);
+    //digitalWrite(PIN_LED, LOW);
+    //digitalWrite(PIN_BUZZER, HIGH);
 
     Buttons::registerChangeFunc(globalMenuButtonHandler);
 
@@ -86,16 +182,16 @@ void setup()
 }
 
 void setupPins() {
-    pinMode(PIN_LED, OUTPUT);
-    pinMode(PIN_BUZZER, OUTPUT);
-    pinMode(PIN_BUTTON_UP, INPUT_PULLUP);
-    pinMode(PIN_BUTTON_MODE, INPUT_PULLUP);
-    pinMode(PIN_BUTTON_DOWN, INPUT_PULLUP);
-    pinMode(PIN_BUTTON_SAVE, INPUT_PULLUP);
+    //pinMode(PIN_LED, OUTPUT);
+    //pinMode(PIN_BUZZER, OUTPUT);
+    //pinMode(PIN_BUTTON_UP, INPUT_PULLUP);
+    //pinMode(PIN_BUTTON_MODE, INPUT_PULLUP);
+    //pinMode(PIN_BUTTON_DOWN, INPUT_PULLUP);
+    //pinMode(PIN_BUTTON_SAVE, INPUT_PULLUP);
 
-    pinMode(PIN_LED_A,OUTPUT);
+    //pinMode(PIN_LED_A,OUTPUT);
     #ifdef USE_DIVERSITY
-        pinMode(PIN_LED_B,OUTPUT);
+        //pinMode(PIN_LED_B,OUTPUT);
     #endif
 
     pinMode(PIN_RSSI_A, INPUT_PULLUP);
@@ -140,6 +236,7 @@ static void globalMenuButtonHandler(
     Button button,
     Buttons::PressType pressType
 ) {
+    /*
     if (
         StateMachine::currentState != StateMachine::State::MENU &&
         button == Button::MODE &&
@@ -147,4 +244,8 @@ static void globalMenuButtonHandler(
     ) {
         StateMachine::switchState(StateMachine::State::MENU);
     }
+    */
+    // TODO talk to fc
+    
 }
+
