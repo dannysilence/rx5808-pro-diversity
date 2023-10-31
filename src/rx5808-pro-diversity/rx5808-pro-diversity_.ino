@@ -91,6 +91,13 @@ void setOutChannel(byte channel) {
   //log->print(y);
 }
 
+// ?
+void setupSettings() {
+    EepromSettings.load();
+    
+    Receiver::setChannel(EepromSettings.startChannel);
+}
+
 
 void setup()
 {
@@ -103,17 +110,12 @@ void setup()
 
     StateMachine::setup();
     Receiver::setup();
-    Ui::setup();
 
     Receiver::setActiveReceiver(Receiver::ReceiverId::A);
+    //Ui::setup();
 }
 
 void setupPins() {
-    //pinMode(PIN_LED_A,OUTPUT);
-    #ifdef USE_DIVERSITY
-        //pinMode(PIN_LED_B,OUTPUT);
-    #endif
-
     pinMode(PIN_RSSI_A, INPUT_PULLUP);
     #ifdef USE_DIVERSITY
         pinMode(PIN_RSSI_B, INPUT_PULLUP);
@@ -128,19 +130,10 @@ void setupPins() {
     digitalWrite(PIN_SPI_DATA, LOW);
 }
 
-void setupSettings() {
-    EepromSettings.load();
-    Receiver::setChannel(EepromSettings.startChannel);
-}
-
 void loop() {
     Receiver::update();
     StateMachine::update();
-    Ui::update();
-    EepromSettings.update();
-
-    // read command and if that is SET_CHANNEL set value
-    // it as vrx channel and set "some different" to vtx  
+    
     if(sa->available()) {
       byte a = fc->readByte();
 	    
@@ -155,6 +148,7 @@ void loop() {
 
 	    // channel set by fc, e.g. channel of source vehicle vtx
 	    byte d = fc->readByte();
+		  
             Receiver::setChannel(d);
 
 	    // simply set out vtx with different channel from what fc set to vrx
@@ -165,11 +159,8 @@ void loop() {
 
 	    setOutChannel(e);
 
-            // what if there is a way to send back vtx CHANNEL
-	    // value to FC?..
-	    // technicaly that fits into command response like 
-	    // 0xAA 0x55 0x03 0x03 VTX_CHANNEL 0x00
-	    // but not sure if that's suitable to handle this way 
+            fc->print("Receive transmission at channel $e");
+	    //fc->write({0xAA, 0x55, 0x03, 
 	  }
 	}
       }
