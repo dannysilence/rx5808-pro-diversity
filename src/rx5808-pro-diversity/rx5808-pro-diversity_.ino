@@ -139,6 +139,11 @@ void loop() {
     Ui::update();
     EepromSettings.update();
 
+    // seems like 1.2GHz vtx may be controlled via Tramp
+    // and 5.8 via both Tramp and SmartAudio, so would be
+    // nice to support both ... some day perhaps.
+    // vrx are controlled in the same manner for both ranges
+	
     // read command and if that is SET_CHANNEL set value
     // it as vrx channel and set "some different" to vtx  
     if(sa->available()) {
