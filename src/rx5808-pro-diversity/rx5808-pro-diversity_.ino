@@ -45,6 +45,8 @@ SOFTWARE.
 
 const byte rxPin = 2;
 const byte txPin = 3;
+const byte sxPin = 4;
+//const byte txPin = 3;
 
 
 // Set up a new SoftwareSerial object
