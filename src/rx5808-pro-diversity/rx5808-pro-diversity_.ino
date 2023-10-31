@@ -164,6 +164,12 @@ void loop() {
 	    }
 
 	    setOutChannel(e);
+
+            // what if there is a way to send back vtx CHANNEL
+	    // value to FC?..
+	    // technicaly that fits into command response like 
+	    // 0xAA 0x55 0x03 0x03 VTX_CHANNEL 0x00
+	    // but not sure if that's suitable to handle this way 
 	  }
 	}
       }
