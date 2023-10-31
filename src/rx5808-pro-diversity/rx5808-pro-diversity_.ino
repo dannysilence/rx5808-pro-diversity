@@ -1,4 +1,5 @@
 /*
+// set the channel in the range 0-40// example: 0xAA 0x55 0x07(Command 3) 0x01(Length) 0x00(All 40 Channels 0-40) 0xB8(CRC8
  * SPI driver based on fs_skyrf_58g-main.c Written by Simon Chambers
  * TVOUT by Myles Metzel
  * Scanner by Johan Hermen
@@ -8,21 +9,16 @@
  * Diversity Receiver Mode and GUI improvements by Shea Ivey
  * OLED Version by Shea Ivey
  * Seperating display concerns by Shea Ivey
-
 The MIT License (MIT)
-
 Copyright (c) 2015 Marko Hoepken
-
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
-
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -52,8 +48,8 @@ const byte txPin = 3;
 
 
 // Set up a new SoftwareSerial object
-
-SoftwareSerial saSerial (rxPin, txPin, 4800);
+SoftwareSerial mySerial1 (sxPin, sxPin, 4800);
+SoftwareSerial mySerial2 (rxPin, txPin, 4800);
 
 
 static void globalMenuButtonHandler(
@@ -62,57 +58,10 @@ static void globalMenuButtonHandler(
 );
 
 
-Stream* sa;
-//Stream* log;
+Stream* vtx;
+Stream* fc;
 
 /*
-// returns setting value ; 0 - channel, 1 - frequency, 2 - version. returns -1 in case of read failure 
-// smartAudio V1 response: VTX: 0xAA 0x55 0x01 (Version/Command) 0x06 (Length) 0x00 (Channel) 0x00 (Power Level) 0x01(OperationMode) 0x16 0xE9(Current Frequency 5865) 0x4D(CRC8)
-// smartAudio V2 response: VTX: 0xAA 0x55 0x09 (Version/Command) 0x06 (Length) 0x01 (Channel) 0x00 (Power Level) 0x1A(OperationMode) 0x16 0xE9(Current Frequency 5865) 0xDA(CRC
-int getOutSetting(byte setting) {
-  byte * buf = {0x00,0x00,0xAA,0x55,0x03,0x00,0x00,0x00,0x00};
-  String m = "VTX Get Settings";
-	
-  sa->write(buf, 9);
-  log->print(m);
-
-  byte a = -1;
-    
-  for(int count = 1; count < 12; count++) {
-    byte b = sa->readByte();
-    if( a == -1) {
-      if (b == 0xAA ) {
-        a = count;
-      }
-    }
-    else
-      if(setting == 0 && count - a == 4){
-        return b;
-      }
-
-      if (setting == 1 && count - a == 6) {
-        byte c = sa->readByte();
-
-        return b * 0x100 + c;
-      }
-
-      if (setting == 0 && count - a == 2) {
-        if(b == 0x01) {
-          return 1;
-        }
-
-        if(b == 0x09) {
-          return 2;
-        }
-
-        return -1;
-      }
-    }
-
-    return -1;
-  }
-}
-
 // set the frequency in the range 5000-6000 MHz
 // Example: 0xAA 0x55 0x09(Command 4) 0x02(Length) 0x16 0xE9(Frequency 5865) 0xDC(CRC8
 void setOutFrequency(int frequency) {
@@ -122,19 +71,17 @@ void setOutFrequency(int frequency) {
   String m = "VTX Frequency: ${frequency}" ;
   sa->write(c, 9);
   log->print(m);
-
   int x = getOutSetting(1) ;
   String y = "VTX Actual Frequency: ${x}";
   log->print(y);
 }
 */
 
-// set the channel in the range 0-40
-// example: 0xAA 0x55 0x07(Command 3) 0x01(Length) 0x00(All 40 Channels 0-40) 0xB8(CRC8
+// set the channel in the range 0-40// example: 0xAA 0x55 0x07(Command 3) 0x01(Length) 0x00(All 40 Channels 0-40) 0xB8(CRC8
 void setOutChannel(byte channel) {
   byte* b =  {0x00,0x00,0xAA,0x55,0x07,0x01,channel,0x00,0x00};
   //String m = "VTX Channel: ${channel}"; 
-  sa->write(b, 9);
+  vtx->write(b, 9);
   //log->print(m);
     
   //int x = getOutSetting(0) ;
@@ -146,8 +93,8 @@ void setOutChannel(byte channel) {
 void setup()
 {
     Serial.begin(115200);
-    sa = &(saSerial);
-    //log = &(Serial);
+    vtx = &(mySerial1);
+    fc  = &(mySerial2);
 	
     setupPins();
     setupSettings();
@@ -190,20 +137,22 @@ void loop() {
     Ui::update();
     EepromSettings.update();
 
+    // read command and if that is SET_CHANNEL set value
+    // it as vrx channel and set "some different" to vtx  
     if(sa->available()) {
-      byte a = sa->readByte();
+      byte a = fc->readByte();
 	    
       if(a == 0xAA) {
-        byte b = sa->readByte();
+        byte b = fc->readByte();
         
 	if(b == 0x55) {
-	  byte c = sa->readByte();
+	  byte c = fc->readByte();
 
 	  if(c == 0x07) {
-            sa->readByte();
+            fc->readByte();
 
-	    // channel set by FC, e.g. channel of source vehicle vtx
-	    byte d = sa->readByte();
+	    // channel set by fc, e.g. channel of source vehicle vtx
+	    byte d = fc->readByte();
             Receiver::setChannel(d);
 
 	    // simply set out vtx with different channel from what fc set to vrx
